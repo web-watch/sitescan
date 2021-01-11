@@ -74,8 +74,9 @@ class Process:
         C = Code()
         D = Data()
         N = Network()
-        # N.send/receive? <-send receive data
         poll_time = str(time.time()).split('.')[0]
+        
+        # N.send/receive? <-send receive data
         with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
             futures = [executor.submit(C.run_jobs, i, poll_time) for i in D.select_jobs()]
             for future in concurrent.futures.as_completed(futures):
