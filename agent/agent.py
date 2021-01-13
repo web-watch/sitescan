@@ -15,16 +15,23 @@ class Settings:
 # Data
 class Data:
     def __init__(self):
-        self.con = sqlite3.connect(agent_path + 'agent_sqlite.db', isolation_level=None)
+        self.con = sqlite3.connect(Settings.agent_path + 'agent_sqlite.db', isolation_level=None)
         self.cursor = self.con.cursor()
 
     def __del__(self):
         self.con.close()
 
     def create_tables(self):
-        sql = "create table if not exists jobs(id integer, name text, appid integer, parameters text);"
+        sql = "create table if not exists jobs(parameters json);"
         #sql += "other tables"
         self.cursor.executescript(sql)
+        self.con.commit()
+
+    def insert_jobs(self, parameters):
+        sql = "delete from jobs;"
+        self.cursor.execute(sql)
+        sql = "insert into jobs(parameters) values (?);"
+        self.cursor.execute(sql, [parameters])
         self.con.commit()
 
     def select_jobs(self):
@@ -37,14 +44,20 @@ class Data:
 # Code
 class Code:
     def load_jobs(self):
-        pass
+        parameters = {"name":"Test", "url":"http://localhost:8000", "validate":1, "text":"user"}
+        parameters = json.dumps(parameters)
+        D = Data()
+        D.create_tables()
+        D.insert_jobs(parameters)
 
     def run_jobs(self, data, poll_time):
         # Add logic switch for Selenium/Code Jobs
         self.run_api(data, poll_time)
 
 
-    def run_api(self, data, poll_time):     
+    def run_api(self, data, poll_time):  
+        #print(data[0])
+        data = json.loads(data[0])   
         packet = {}
         name = data['name']
         url = data['url']
@@ -75,8 +88,7 @@ class Process:
         D = Data()
         N = Network()
         poll_time = str(time.time()).split('.')[0]
-        
-        # N.send/receive? <-send receive data
+                
         with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
             futures = [executor.submit(C.run_jobs, i, poll_time) for i in D.select_jobs()]
             for future in concurrent.futures.as_completed(futures):
@@ -86,6 +98,8 @@ class Process:
                     print("Too long!")
                     sys.stdout.flush()
 
+        # N.send/receive? <-send receive data.  Data will most likely be sent the second poll due to the async launch 
+
     def scheduler(self):
         while True:
             a = datetime.datetime.now().second
@@ -93,4 +107,7 @@ class Process:
                 self.launcher() 
                 time.sleep(1)
 
-scheduler()
+C = Code()
+C.load_jobs()
+P = Process()
+P.scheduler()
